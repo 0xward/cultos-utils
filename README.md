@@ -10,10 +10,27 @@ A specialized developer utility framework containing metadata modeling tools and
 
 ## Installation
 
+### Prerequisites
+- Node.js >= 18.0.0
+- npm >= 9.0.0 (or yarn >= 1.22.0 / pnpm >= 8.0.0)
+
+### Package Deployment
+Execute the targeted acquisition command matching your production environment package manager setup:
+
 ```bash
+# Using Node Package Manager (Default)
 npm install @0xward/cultos-utils
+
+# Using Yarn Package Manager
+yarn add @0xward/cultos-utils
+
+# Using PNPM Package Manager
+pnpm add @0xward/cultos-utils
 ```
 
+### Peer Dependencies
+For secure runtime cryptographic executions and ledger state mutations, ensure your runtime container establishes communication boundaries with the primary network bindings if processing on-chain blocks:
+- For Stacks L2 layers: @stacks/transactions (>= 6.x) for standard SIP-10 token serialization compliance.
 ---
 
 ## Core Capabilities
