@@ -1,0 +1,16 @@
+{
+  "name": "@0xward/cultos-utils",
+  "version": "1.0.0",
+  "description": "Utility and identity generator for CultOS ecosystem.",
+  "main": "index.js",
+  "keywords": [
+    "0xward",
+    "web3",
+    "utility"
+  ],
+  "author": "0xward",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
