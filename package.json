@@ -1,6 +1,6 @@
 {
   "name": "@0xward/cultos-utils",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Futuristic AI-powered generator framework for viral internet-style cult meme coins in the Stacks ecosystem.",
   "main": "index.js",
   "keywords": [
