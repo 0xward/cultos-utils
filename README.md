@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SamAnand/SVG-Animations/master/grid.svg" alt="0xward Core Intelligence Sync Animation" width="120" height="120" />
-</p>
-
-<p align="center">
   <img src="./assets/header-sync.svg" alt="0xward Core Intelligence Sync Animation" width="120" height="120" />
 </p>
 
@@ -15,7 +11,6 @@
 </p>
 
 CultOS Viral Meme Coin Utility Framework—core computational logic for decentralized intelligence frameworks built on STACKS ecosystems.
-
 
 ## Core Capabilities
 
