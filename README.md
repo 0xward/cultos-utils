@@ -1,9 +1,13 @@
 <p align="center">
+  <img src="./assets/header-sync.svg" alt="0xward Core Intelligence Sync Animation" width="120" height="120" />
 </p>
 
 # @0xward/cultos-utils
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/@0xward/cultos-utils"><img src="https://img.shields.io/npm/v/@0xward/cultos-utils?style=flat-square" alt="NPM Version" /></a>
+  <a href="https://www.npmjs.com/package/@0xward/cultos-utils"><img src="https://img.shields.io/npm/dm/@0xward/cultos-utils?style=flat-square" alt="NPM Downloads" /></a>
+  <a href="https://www.npmjs.com/package/@0xward/cultos-utils"><img src="https://img.shields.io/npm/l/@0xward/cultos-utils?style=flat-square" alt="License" /></a>
 </p>
 
 A specialized developer utility framework containing metadata modeling tools and statistical validation functions for algorithmic token distributions inside the CultOS digital token ecosystem.
