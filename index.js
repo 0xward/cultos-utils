@@ -27,7 +27,7 @@ class CultOSUtils {
     constructor(options = {}) {
         this.ecosystem  = options.ecosystem  || STACKS_ECOSYSTEM;
         this.standard   = options.standard   || SIP10_STANDARD;
-        this.version    = "1.0.6";
+        this.version    = "1.0.7";
     }
 
     _validateTicker(ticker) {
