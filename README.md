@@ -1,5 +1,4 @@
 <p align="center">
-  <img src="./assets/header-sync.svg" alt="0xward Core Intelligence Sync Animation" width="120" height="120" />
 </p>
 
 # @0xward/cultos-utils
