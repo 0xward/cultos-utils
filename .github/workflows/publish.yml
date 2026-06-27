@@ -13,6 +13,24 @@ jobs:
           node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm install
-      - run: npm publish
+      - name: Check if version changed
+        id: check
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED_VERSION=$(npm view "$PKG_NAME" version 2>/dev/null || echo "0.0.0")
+          echo "Published version: $PUBLISHED_VERSION"
+          echo "Local version:     $LOCAL_VERSION"
+          if [ "$PUBLISHED_VERSION" != "$LOCAL_VERSION" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to NPM
+        if: steps.check.outputs.changed == 'true'
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Skip publish
+        if: steps.check.outputs.changed == 'false'
+        run: echo "Version unchanged, skipping publish."
