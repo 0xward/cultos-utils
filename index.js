@@ -1,151 +1,225 @@
 // @0xward/cultos-utils
-// AI-powered meme coin generator framework for the Stacks ecosystem (Bitcoin L2)
-// SIP-10 compliant token metadata, viral factor scoring, and cult mechanics
+// Shared utility layer for CultOS — the AI-powered memetic identity engine on Stacks (Bitcoin L2).
+// Provides fee calculation, token field sanitization, viral score rating, and SIP-010 metadata
+// generation — the same logic used by the CultOS V2 web app before every on-chain deployment.
 
-const SIP10_STANDARD       = "SIP-010";
-const STACKS_ECOSYSTEM     = "Stacks Bitcoin L2";
-const DEFAULT_SUPPLY       = "1000000000";
-const MAX_TICKER_LENGTH    = 8;
-const MIN_TICKER_LENGTH    = 2;
-const MAX_NAME_LENGTH      = 64;
+const SIP10_STANDARD   = "SIP-010";
+const STACKS_ECOSYSTEM = "Stacks Bitcoin L2";
+const DEFAULT_SUPPLY   = "1000000000";
 
-const CULT_ARCHETYPES = {
-    degen:   { viralMultiplier: 1.8, description: "High risk, high reward degenerate energy"  },
-    meme:    { viralMultiplier: 2.0, description: "Pure internet culture and meme propagation" },
-    oracle:  { viralMultiplier: 1.5, description: "Mystical on-chain prophecy narrative"       },
-    rebel:   { viralMultiplier: 1.6, description: "Anti-establishment movement energy"         },
-    cosmic:  { viralMultiplier: 1.7, description: "Universal and transcendental branding"      },
+// ─── NETWORK CONFIG ───────────────────────────────────────────────────────────
+const STACKS_NETWORKS = {
+  mainnet: { chainId: 1,          apiUrl: "https://api.mainnet.hiro.so",  currency: "STX" },
+  testnet: { chainId: 2147483648, apiUrl: "https://api.testnet.hiro.so",  currency: "STX" },
+  devnet:  { chainId: 2147483648, apiUrl: "http://localhost:3999",         currency: "STX" },
 };
 
+// ─── CULT ARCHETYPES ──────────────────────────────────────────────────────────
+const CULT_ARCHETYPES = {
+  degen:  { viralMultiplier: 1.8, description: "High risk, high reward degenerate energy"  },
+  meme:   { viralMultiplier: 2.0, description: "Pure internet culture and meme propagation" },
+  oracle: { viralMultiplier: 1.5, description: "Mystical on-chain prophecy narrative"       },
+  rebel:  { viralMultiplier: 1.6, description: "Anti-establishment movement energy"         },
+  cosmic: { viralMultiplier: 1.7, description: "Universal and transcendental branding"      },
+};
+
+// ─── TOKENOMICS PRESETS ───────────────────────────────────────────────────────
 const TOKENOMICS_PRESETS = {
-    fair:    { community: 80, team: 10, treasury: 10 },
-    stealth: { community: 95, team: 0,  treasury: 5  },
-    vested:  { community: 60, team: 20, treasury: 20 },
+  fair:    { community: 80, team: 10, treasury: 10 },
+  stealth: { community: 95, team: 0,  treasury: 5  },
+  vested:  { community: 60, team: 20, treasury: 20 },
+};
+
+// ─── FIELD LIMITS (mirrors oracle.ts server-side guards) ─────────────────────
+const FIELD_LIMITS = {
+  name:   64,
+  ticker: 8,
+  lore:   490,
 };
 
 class CultOSUtils {
-    constructor(options = {}) {
-        this.ecosystem  = options.ecosystem  || STACKS_ECOSYSTEM;
-        this.standard   = options.standard   || SIP10_STANDARD;
-        this.version    = "1.1.4";
+  /**
+   * @param {Object} options
+   * @param {"mainnet"|"testnet"|"devnet"} [options.network="mainnet"]
+   * @param {string}  [options.ecosystem]
+   * @param {string}  [options.standard]
+   */
+  constructor(options = {}) {
+    const net = options.network || "mainnet";
+    if (!STACKS_NETWORKS[net]) {
+      throw new Error(`Unsupported network: "${net}". Use "mainnet", "testnet", or "devnet".`);
+    }
+    this.networkName   = net;
+    this.networkConfig = STACKS_NETWORKS[net];
+    this.ecosystem     = options.ecosystem || STACKS_ECOSYSTEM;
+    this.standard      = options.standard  || SIP10_STANDARD;
+    this.version       = "1.2.0";
+  }
+
+  // ── SANITIZATION ─────────────────────────────────────────────────────────────
+
+  /**
+   * Sanitize a token field to printable ASCII, identical to the guard used in
+   * CultOS V2's handleDeploy() before every on-chain contract call.
+   *
+   * @param {string} str
+   * @param {"name"|"ticker"|"lore"} field
+   * @returns {string}
+   */
+  sanitizeField(str, field) {
+    if (typeof str !== "string") throw new Error(`sanitizeField: "${field}" must be a string.`);
+    const max = FIELD_LIMITS[field];
+    if (!max) throw new Error(`sanitizeField: unknown field "${field}". Use: name, ticker, lore.`);
+    return str.replace(/[^ -~]/g, "").slice(0, max).trim();
+  }
+
+  /**
+   * Sanitize all three required token fields at once.
+   * Returns { safeName, safeTicker, safeLore } ready to pass to openContractCall().
+   *
+   * @param {{ upgradedName: string, ticker: string, lore: string }} oracleResult
+   * @returns {{ safeName: string, safeTicker: string, safeLore: string }}
+   */
+  sanitizeOracleResult(oracleResult) {
+    if (!oracleResult || typeof oracleResult !== "object") {
+      throw new Error("sanitizeOracleResult: expected an oracle result object.");
+    }
+    return {
+      safeName:   this.sanitizeField(oracleResult.upgradedName || "", "name"),
+      safeTicker: this.sanitizeField(oracleResult.ticker        || "", "ticker"),
+      safeLore:   this.sanitizeField(oracleResult.lore          || "", "lore"),
+    };
+  }
+
+  // ── FEE CALCULATION ──────────────────────────────────────────────────────────
+
+  /**
+   * Compute the deployment fee in STX from a viralScore.
+   * Mirrors the formula in CultOS V2 App.tsx handleDeploy():
+   *   feeFloat = 0.05 + (viralScore / 100) * 0.1
+   *
+   * @param {number} viralScore  Integer 40–95 returned by the Oracle.
+   * @returns {{ feeSTX: string, microSTX: number, viralScore: number }}
+   */
+  calcDeployFee(viralScore) {
+    const score = Math.min(95, Math.max(40, Math.round(Number(viralScore) || 60)));
+    const feeFloat = 0.05 + (score / 100) * 0.1;
+    return {
+      feeSTX:     feeFloat.toFixed(3),
+      microSTX:   Math.round(feeFloat * 1_000_000),
+      viralScore: score,
+    };
+  }
+
+  // ── VIRAL SCORE RATING ────────────────────────────────────────────────────────
+
+  /**
+   * Convert a numeric viralScore to the display label used throughout CultOS V2.
+   *   >= 80  → "Viral"
+   *   >= 50  → "Growing"
+   *   < 50   → "Niche"
+   *
+   * @param {number} viralScore
+   * @returns {{ rating: string, color: string }}
+   */
+  getViralRating(viralScore) {
+    const score = Number(viralScore) || 0;
+    if (score >= 80) return { rating: "Viral",   color: "#22C55E" };
+    if (score >= 50) return { rating: "Growing", color: "#F59E0B" };
+    return                  { rating: "Niche",   color: "#EF4444" };
+  }
+
+  // ── SIP-010 METADATA ─────────────────────────────────────────────────────────
+
+  /**
+   * Generate a fully-shaped SIP-010 token metadata object.
+   * Used by CultOS V2 to preview a token before the user confirms deployment.
+   *
+   * @param {string} name
+   * @param {string} ticker
+   * @param {Object} [options]
+   * @param {string} [options.supply]
+   * @param {string} [options.archetype="meme"]
+   * @param {number} [options.decimals=6]
+   * @param {string} [options.tokenomics="fair"]
+   * @returns {Object}
+   */
+  generateMemeMetadata(name, ticker, options = {}) {
+    const safeName   = this.sanitizeField(name,   "name");
+    const safeTicker = this.sanitizeField(ticker, "ticker").toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+    if (safeName.length < 3)   throw new Error(`name too short after sanitize: "${safeName}"`);
+    if (safeTicker.length < 3) throw new Error(`ticker too short after sanitize: "${safeTicker}"`);
+
+    const supply    = String(options.supply || DEFAULT_SUPPLY).replace(/_/g, "");
+    const archetype = options.archetype  || "meme";
+    const decimals  = options.decimals   ?? 6;
+    const preset    = options.tokenomics || "fair";
+
+    if (!CULT_ARCHETYPES[archetype]) {
+      throw new Error(`Unknown archetype: "${archetype}". Use: ${Object.keys(CULT_ARCHETYPES).join(", ")}.`);
+    }
+    if (!TOKENOMICS_PRESETS[preset]) {
+      throw new Error(`Unknown tokenomics preset: "${preset}". Use: ${Object.keys(TOKENOMICS_PRESETS).join(", ")}.`);
     }
 
-    _validateTicker(ticker) {
-        if (typeof ticker !== "string" || ticker.trim().length === 0) {
-            throw new Error("ticker must be a non-empty string.");
-        }
-        const clean = ticker.trim().toUpperCase();
-        if (clean.length < MIN_TICKER_LENGTH || clean.length > MAX_TICKER_LENGTH) {
-            throw new Error(
-                `ticker must be ${MIN_TICKER_LENGTH}–${MAX_TICKER_LENGTH} characters. Got: "${clean}" (${clean.length})`
-            );
-        }
-        if (!/^[A-Z0-9]+$/.test(clean)) {
-            throw new Error(`ticker must only contain uppercase letters and digits. Got: "${clean}"`);
-        }
-        return clean;
-    }
+    const viralScore = this._computeViralScore(archetype, supply, safeName.length);
+    const { rating: viralRating } = this.getViralRating(viralScore);
+    const { feeSTX, microSTX }    = this.calcDeployFee(viralScore);
+    const tokenomics = TOKENOMICS_PRESETS[preset];
+    const cultMeta   = CULT_ARCHETYPES[archetype];
 
-    _validateName(name) {
-        if (typeof name !== "string" || name.trim().length === 0) {
-            throw new Error("name must be a non-empty string.");
-        }
-        if (name.trim().length > MAX_NAME_LENGTH) {
-            throw new Error(`name must not exceed ${MAX_NAME_LENGTH} characters.`);
-        }
-        return name.trim();
-    }
+    return {
+      name:                 safeName,
+      ticker:               safeTicker,
+      supply,
+      decimals,
+      sip10Standard:        this.standard,
+      ecosystem:            this.ecosystem,
+      securedBy:            "Bitcoin",
+      network:              this.networkName,
+      archetype,
+      archetypeDescription: cultMeta.description,
+      viralScore,
+      viralRating,
+      estimatedFeeSTX:      feeSTX,
+      estimatedMicroSTX:    microSTX,
+      tokenomics: {
+        preset,
+        communityPercent: tokenomics.community,
+        teamPercent:      tokenomics.team,
+        treasuryPercent:  tokenomics.treasury,
+      },
+      generatedAt: new Date().toISOString(),
+      sdkVersion:  this.version,
+    };
+  }
 
-    _validateSupply(supply) {
-        const s = String(supply || DEFAULT_SUPPLY).replace(/_/g, "");
-        if (!/^\d+$/.test(s) || BigInt(s) <= 0n) {
-            throw new Error(`supply must be a positive integer string. Got: "${supply}"`);
-        }
-        return s;
-    }
+  // ── HELPERS ───────────────────────────────────────────────────────────────────
 
-    _computeViralScore(archetype, supply, nameLength) {
-        const base      = CULT_ARCHETYPES[archetype]?.viralMultiplier || 1.0;
-        const supplyNum = Math.log10(parseFloat(supply) || 1);
-        const namePenalty = nameLength > 20 ? 0.9 : 1.0;
-        const raw = base * (supplyNum / 10) * namePenalty * 100;
-        return Math.min(Math.round(raw), 100);
-    }
+  getCultArchetypes() {
+    return Object.entries(CULT_ARCHETYPES).map(([key, val]) => ({ id: key, ...val }));
+  }
 
-    static generateMemeMetadata(name, ticker, options = {}) {
-        const instance = new CultOSUtils(options);
-        return instance.generateMemeMetadata(name, ticker, options);
-    }
+  getTokenomicsPresets() {
+    return Object.entries(TOKENOMICS_PRESETS).map(([key, val]) => ({ id: key, ...val }));
+  }
 
-    generateMemeMetadata(name, ticker, options = {}) {
-        const validName    = this._validateName(name);
-        const validTicker  = this._validateTicker(ticker);
-        const supply       = this._validateSupply(options.supply);
-        const archetype    = options.archetype || "meme";
-        const decimals     = options.decimals  ?? 6;
-        const preset       = options.tokenomics || "fair";
+  getSupportedNetworks() {
+    return Object.keys(STACKS_NETWORKS).map((key) => ({ name: key, ...STACKS_NETWORKS[key] }));
+  }
 
-        if (!CULT_ARCHETYPES[archetype]) {
-            throw new Error(
-                `Unknown archetype: "${archetype}". Use: ${Object.keys(CULT_ARCHETYPES).join(", ")}.`
-            );
-        }
-        if (!TOKENOMICS_PRESETS[preset]) {
-            throw new Error(
-                `Unknown tokenomics preset: "${preset}". Use: ${Object.keys(TOKENOMICS_PRESETS).join(", ")}.`
-            );
-        }
+  getVersion() { return this.version; }
 
-        const viralScore   = this._computeViralScore(archetype, supply, validName.length);
-        const tokenomics   = TOKENOMICS_PRESETS[preset];
-        const cultMeta     = CULT_ARCHETYPES[archetype];
+  // ── PRIVATE ───────────────────────────────────────────────────────────────────
 
-        return {
-            name:          validName,
-            ticker:        validTicker,
-            supply,
-            decimals,
-            sip10Standard: this.standard,
-            ecosystem:     this.ecosystem,
-            securedBy:     "Bitcoin",
-            archetype,
-            archetypeDescription: cultMeta.description,
-            viralScore,
-            viralRating:   viralScore >= 80 ? "Viral" : viralScore >= 50 ? "Growing" : "Niche",
-            tokenomics: {
-                preset,
-                communityPercent: tokenomics.community,
-                teamPercent:      tokenomics.team,
-                treasuryPercent:  tokenomics.treasury,
-            },
-            generatedAt:   new Date().toISOString(),
-            sdkVersion:    this.version,
-        };
-    }
-
-    computeViralFactor(metadata) {
-        if (!metadata || typeof metadata !== "object") {
-            throw new Error("metadata must be a valid object.");
-        }
-        if (!metadata.ticker || !metadata.name) {
-            throw new Error("metadata must include 'ticker' and 'name'.");
-        }
-        const archetype  = metadata.archetype || "meme";
-        const supply     = metadata.supply    || DEFAULT_SUPPLY;
-        return this._computeViralScore(archetype, supply, metadata.name.length);
-    }
-
-    getCultArchetypes() {
-        return Object.entries(CULT_ARCHETYPES).map(([key, val]) => ({ id: key, ...val }));
-    }
-
-    getTokenomicsPresets() {
-        return Object.entries(TOKENOMICS_PRESETS).map(([key, val]) => ({ id: key, ...val }));
-    }
-
-    getVersion() {
-        return this.version;
-    }
+  _computeViralScore(archetype, supply, nameLength) {
+    const base       = CULT_ARCHETYPES[archetype]?.viralMultiplier || 1.0;
+    const supplyNum  = Math.log10(parseFloat(supply) || 1);
+    const namePenalty = nameLength > 20 ? 0.9 : 1.0;
+    const raw = base * (supplyNum / 10) * namePenalty * 100;
+    return Math.min(95, Math.max(40, Math.round(raw)));
+  }
 }
 
-module.exports = { CultOSUtils, CULT_ARCHETYPES, TOKENOMICS_PRESETS, SIP10_STANDARD };
+module.exports = { CultOSUtils, CULT_ARCHETYPES, TOKENOMICS_PRESETS, STACKS_NETWORKS, SIP10_STANDARD };
